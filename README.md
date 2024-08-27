@@ -1,3 +1,5 @@
+# Code for "Cell counting with trainableh-maxima and connected component layers", submitted to JMIV (Journal of Mathematical Imaging and Vision). 
+This work is extention of our previous work presented in DGMM24 [counting melanocytes](https://link.springer.com/chapter/10.1007/978-3-031-57793-2_32)
 
 ## Install morpholayers
 Install morpholayer: 
@@ -143,3 +145,33 @@ The command lines are same as described in Experiments on yellow cells dataset
 
 ## Training and test with joint loss
 ## For the training and test with joint loss, please refer to the [DGMM cell countings repository](https://github.com/peter12398/DGMM2024-comptage-cellule).
+
+
+If you find this code useful in your research, please consider citing:
+```
+@inproceedings{liu2024counting,
+  title={Counting melanocytes with trainable h-maxima and connected component layers},
+  author={Liu, Xiaohu and Blusseau, Samy and Velasco-Forero, Santiago},
+  booktitle={International Conference on Discrete Geometry and Mathematical Morphology},
+  pages={417--430},
+  year={2024},
+  organization={Springer}
+}
+
+@inproceedings{VelascoBMVC2022,
+Author = {Velasco-Forero, S. and Rhim, A. and Angulo, J.},
+Title = {Fixed Point Layers for Geodesic Morphological Operations},
+Booktitle  = {British Machine Vision Conference (BMVC)},
+Year = {2022}
+}
+
+@article{VelascoSIAM2022,
+author = {Velasco-Forero, Santiago and Pag\`{e}s, R. and Angulo, Jesus},
+title = {Learnable Empirical Mode Decomposition based on Mathematical Morphology},
+journal = {SIAM Journal on Imaging Sciences},
+volume = {15},
+number = {1},
+pages = {23-44},
+year = {2022},
+}
+```
