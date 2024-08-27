@@ -32,6 +32,13 @@ import argparse
 print(tf.__version__)
 print('It should be >= 2.0.0.')
 
+import os
+dirname = os.getcwd()
+#dirname = os.path.dirname(__file__)
+parent_dir_name = os.path.dirname(dirname)
+print("parent_dir_name = {}.\n".format(parent_dir_name))
+
+
 
 PATCH_SIZE = 1024
 REDUCE_RATIO = 4
@@ -45,22 +52,22 @@ def condition_equal(last,new,image):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", default="test", type=str, help="train or test")
-parser.add_argument("--ROOT_PATH", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells", type=str, help="path to the root dir")
-parser.add_argument("--DATA_DIR", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/data/database_melanocytes_trp1/".format(PATCH_SIZE), type=str, help="path to TRP1 dataset")
-parser.add_argument("--exp_name", default="newCCCLayer_RMSProp_dgmm24config_new_def_grad_minus_upstream_interactive_N_2_cache_Noclip_reduceLrPlateau".format(PATCH_SIZE), type=str, help="experiment name")
-parser.add_argument("--model_weight_path", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/best_model_newCCCLayer_RMSProp_dgmm24config_new_def_grad_minus_upstream_interactive_N_2_cache_Noclip_reduceLrPlateau.h5".format(PATCH_SIZE), type=str, help="experiment name")
-
+parser.add_argument("--DATA_DIR", default = parent_dir_name + "/data/database_melanocytes_trp1/", type=str, help="path to TRP1 dataset")
+parser.add_argument("--exp_name", default="debug", type=str, help="experiment name")
+parser.add_argument("--model_weight_path", default="pretrained/model/weight.h5", type=str, help="experiment name")
+parser.add_argument("--best_h_dataset_name", default="best_h_dataset255", type=str, help="best_h_dataset_name name")
+parser.add_argument("--Explicit_backpropagation_mode", default="minus_one", choices=["minus_one", "Puissance_N_2"] ,type=str, help="experiment name")
 args = parser.parse_args()
 
 NORMALISE01 = False
 #if not NORMALISE01:
-dir_name = "best_h_dataset255"
+dir_name = args.best_h_dataset_name #"best_h_dataset255"
 #dir_name = "best_h_dataset255_new"
 #else:
 #    dir_name = "best_h_dataset01"
 print("dir:{} used".format(dir_name))    
 
-ROOT_PATH = args.ROOT_PATH #"/home/xiaohu/workspace/MINES/DGMM2024_comptage_cellule"
+ROOT_PATH = parent_dir_name #ROOT_PATH #"/home/xiaohu/workspace/MINES/DGMM2024_comptage_cellule"
 output_npy_save_path = ROOT_PATH + "/{}/ouput_np".format(dir_name)
 output_h_file_save_path = ROOT_PATH + "/{}/best_h".format(dir_name)
 input_npy_save_path = ROOT_PATH + "/{}/input_np".format(dir_name)
@@ -118,39 +125,50 @@ def reconstruction_dilation(X):
 
 @tf.custom_gradient
 def custom_h_rec_and_exact_cc(xinput):
-  x=xinput[0]
-  #print('x.shape',x.shape)
-  h=xinput[1]
-  h=tf.expand_dims(tf.expand_dims(h,axis=-1),axis=-1)
-  #print('h.shape',h.shape)
-  x=tf.stop_gradient(x)
+    x=xinput[0]
+    #print('x.shape',x.shape)
+    h=xinput[1]
+    h=tf.expand_dims(tf.expand_dims(h,axis=-1),axis=-1)
+    #print('h.shape',h.shape)
+    x=tf.stop_gradient(x)
 
-  xh=reconstruction_dilation([x-h,x])
-  #X_xh = x-xh
-  epsilon = 1e-5
-  Rmax=(xh-reconstruction_dilation([xh-epsilon,xh]))>0
-  dxh_dh = tf.cast(Rmax, tf.dtypes.float32)  #tape.jacobian(xh, h)
+    xh=reconstruction_dilation([x-h,x])
+    #X_xh = x-xh
+    epsilon = 1e-5
+    Rmax=(xh-reconstruction_dilation([xh-epsilon,xh]))>0
+    dxh_dh = tf.cast(Rmax, tf.dtypes.float32)  #tape.jacobian(xh, h)
 
-  N = 2
-  print("N={} used inside.".format(N))
-  def grad(upstream):
-    return_grad = -upstream #upstream*tf.reduce_sum(-N*((x-xh)**(N-1)/(h**N))*((x-xh)/(h)+dxh_dh)) #tf.reduce_sum(N*h*((x - xh)/h)**N*(-dxh_dh/h - (x - xh)/h**2)/(x - xh),axis=[1,2])
-    print('return_grad:',return_grad)
-    return upstream, return_grad  #upstream *N*h*((x - xh)/h)**N*(-Derivative(xh(h), h)/h - (x - xh)/h**2)/(x - xh)
-  #Connect Components Counting
-  
-  xminuxxh = dxh_dh #x-xh
-  U=Sampling()(xminuxxh)
-  M=tf.keras.layers.Minimum()([U,xminuxxh])
-  R=tf.keras.layers.Lambda(geodesic_dilation)([M,xminuxxh])
-  Detection=tf.cast(U==R,tf.float32)
-  CC=tf.math.reduce_sum(Detection,axis=[1,2])
-  print('CC',CC)
-  return CC, grad
-  """
-  CC = tf.math.reduce_sum(((x-xh)/h)**10000,axis=[1,2])
-  return CC, grad
-  """
+    N = 2
+    print("N={} used inside.".format(N))
+    if args.Explicit_backpropagation_mode == "minus_one":
+        def grad(upstream):
+            return_grad = -upstream #upstream*tf.reduce_sum(-N*((x-xh)**(N-1)/(h**N))*((x-xh)/(h)+dxh_dh)) #tf.reduce_sum(N*h*((x - xh)/h)**N*(-dxh_dh/h - (x - xh)/h**2)/(x - xh),axis=[1,2])
+            print('return_grad:',return_grad)
+            return upstream, return_grad  #upstream *N*h*((x - xh)/h)**N*(-Derivative(xh(h), h)/h - (x - xh)/h**2)/(x - xh)
+        #Connect Components Counting
+
+    elif args.Explicit_backpropagation_mode == "Puissance_N_2":
+        def grad(upstream):
+            return_grad = upstream*tf.reduce_sum(-N*((x-xh)**(N-1)/(h**N))*((x-xh)/(h)+dxh_dh)) #tf.reduce_sum(N*h*((x - xh)/h)**N*(-dxh_dh/h - (x - xh)/h**2)/(x - xh),axis=[1,2])
+            print('return_grad:',return_grad)
+            return upstream, return_grad  #upstream *N*h*((x - xh)/h)**N*(-Derivative(xh(h), h)/h - (x - xh)/h**2)/(x - xh)
+        #Connect Components Counting
+    else:
+        raise NotImplementedError
+
+    
+    xminuxxh = dxh_dh #x-xh
+    U=Sampling()(xminuxxh)
+    M=tf.keras.layers.Minimum()([U,xminuxxh])
+    R=tf.keras.layers.Lambda(geodesic_dilation)([M,xminuxxh])
+    Detection=tf.cast(U==R,tf.float32)
+    CC=tf.math.reduce_sum(Detection,axis=[1,2])
+    print('CC',CC)
+    return CC, grad
+    """
+    CC = tf.math.reduce_sum(((x-xh)/h)**10000,axis=[1,2])
+    return CC, grad
+    """
 
 
 class Sampling(tf.keras.layers.Layer):
@@ -501,7 +519,7 @@ class H_maxima_model:
         self.resume = resume
         
         if self.resume:
-            best_weight_load_path = args.ROOT_PATH + '/best_model_{}.h5'.format(exp_name)
+            best_weight_load_path = ROOT_PATH + '/best_model_{}.h5'.format(exp_name)
             self.nn.load_weights(best_weight_load_path)
             print("load weight from :{}".format(best_weight_load_path))
         
@@ -539,7 +557,7 @@ class H_maxima_model:
 
         #Callback definition
         CBs = [
-            tf.keras.callbacks.ModelCheckpoint(args.ROOT_PATH + '/best_model_{}.h5'.format(exp_name), monitor='val_loss', verbose=1 ,save_weights_only=True, save_best_only=True, mode='min', period=1),
+            tf.keras.callbacks.ModelCheckpoint(ROOT_PATH + '/best_model_{}.h5'.format(exp_name), monitor='val_loss', verbose=1 ,save_weights_only=True, save_best_only=True, mode='min', period=1),
             tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=200, min_lr=0.0001),
             tf.keras.callbacks.TensorBoard(log_dir='./logs/{}'.format(args.exp_name), histogram_freq=0, batch_size=BATCH_SIZE, write_graph=True, write_grads=False, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None, embeddings_data=None, update_freq='epoch'),
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0,
@@ -570,7 +588,7 @@ class H_maxima_model:
         
     def test(self,):      
 
-        best_weight_load_path = args.model_weight_path #args.ROOT_PATH + '/pretrained_model_weight/best_model_{}.h5'.format(exp_name)
+        best_weight_load_path = args.model_weight_path #ROOT_PATH + '/pretrained_model_weight/best_model_{}.h5'.format(exp_name)
         self.nn.load_weights(best_weight_load_path)
         print("load weight from :{}".format(best_weight_load_path))
         
@@ -635,7 +653,7 @@ class H_maxima_model:
         plt.xlabel('True cell number')
         plt.ylabel('Estimated cell number')
 
-        save_fig_path = args.ROOT_PATH+"/visualize_test_{}".format(exp_name)
+        save_fig_path = ROOT_PATH+"/visualize_test_{}".format(exp_name)
         if not os.path.exists(save_fig_path):
             os.makedirs(save_fig_path)
             print("{} made.".format(save_fig_path))
@@ -643,7 +661,7 @@ class H_maxima_model:
         for i in range(len(n_gt_array)):                           
             ax.annotate('%s' % str(i), xy = [n_gt_array[i], n_detec_array[i]] , textcoords='data')
         plt.title('Predicted vs true cell number, val set')
-        plt.savefig(args.ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'n_detect_and_n_gt'))
+        plt.savefig(ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'n_detect_and_n_gt'))
         plt.show()
 
 
@@ -664,7 +682,7 @@ class H_maxima_model:
         for i in range(len(gt_h_array)):                           
             ax.annotate('%s' % str(i), xy = [gt_h_array[i], pr_h_array[i]] , textcoords='data')
         plt.title('Predicted vs true h, val set')
-        plt.savefig(args.ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'pr_h_and_gt_h'))
+        plt.savefig(ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'pr_h_and_gt_h'))
         plt.show()
 
                 

@@ -32,6 +32,11 @@ import argparse
 print(tf.__version__)
 print('It should be >= 2.0.0.')
 
+import os
+dirname = os.getcwd()
+#dirname = os.path.dirname(__file__)
+parent_dir_name = os.path.dirname(dirname)
+print("parent_dir_name = {}.\n".format(parent_dir_name))
 
 PATCH_SIZE = 1024
 REDUCE_RATIO = 4
@@ -45,25 +50,24 @@ def condition_equal(last,new,image):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", default="test", type=str, help="train or test")
-parser.add_argument("--ROOT_PATH", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells", type=str, help="path to the root dir")
-parser.add_argument("--DATA_DIR", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/data/fluocells_organised_with_zeros_official_testsplit", type=str, help="path to TRP1 dataset")
-parser.add_argument("--exp_name", default="newCCCLayer_RMSProp_dgmm24_cache_Noclip_yellow_cells_reduceLrPlateau_with_zeros_official_testsplit".format(PATCH_SIZE), type=str, help="experiment name")
-parser.add_argument("--model_weight_path", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/best_model_newCCCLayer_RMSProp_dgmm24_cache_Noclip_yellow_cells_reduceLrPlateau_with_zeros_official_testsplit.h5".format(PATCH_SIZE), type=str, help="experiment name")
-
+parser.add_argument("--DATA_DIR", default = parent_dir_name + "/data/fluocells_organised_with_zeros_official_testsplit", type=str, help="path to TRP1 dataset")
+parser.add_argument("--exp_name", default="debug", type=str, help="experiment name")
+parser.add_argument("--model_weight_path", default="pretrained/model/weight.h5", type=str, help="experiment name")
+parser.add_argument("--best_h_dataset_name", default="best_h_dataset255_yellow_cells_debug", type=str, help="best_h_dataset_name name")
 args = parser.parse_args()
 
 NORMALISE01 = False
 #if not NORMALISE01:
-dir_name = "best_h_dataset255_yellow_cells_withZeros_forloopearlystop_official_testsplit_bugfixGtMask" #"best_h_dataset255_yellow_cells"
+dir_name = args.best_h_dataset_name #"best_h_dataset255_yellow_cells_withZeros_forloopearlystop_official_testsplit_bugfixGtMask" #"best_h_dataset255_yellow_cells"
 #dir_name = "best_h_dataset255_new"
 #else:
 #    dir_name = "best_h_dataset01"
 print("dir:{} used".format(dir_name))    
 
-ROOT_PATH = args.ROOT_PATH #"/home/xiaohu/workspace/MINES/DGMM2024_comptage_cellule"
-output_npy_save_path = ROOT_PATH + "/{}/ouput_np".format(dir_name)
-output_h_file_save_path = ROOT_PATH + "/{}/best_h".format(dir_name)
-input_npy_save_path = ROOT_PATH + "/{}/input_np".format(dir_name)
+ROOT_PATH = parent_dir_name #"/home/xiaohu/workspace/MINES/DGMM2024_comptage_cellule"
+output_npy_save_path = ROOT_PATH + "/data/{}/ouput_np".format(dir_name)
+output_h_file_save_path = ROOT_PATH + "/data/{}/best_h".format(dir_name)
+input_npy_save_path = ROOT_PATH + "/data/{}/input_np".format(dir_name)
 
 def count(images):
     """PLot images in one row."""
@@ -436,7 +440,7 @@ class H_maxima_model:
         self.resume = resume
         
         if self.resume:
-            best_weight_load_path = args.ROOT_PATH + '/best_model_{}.h5'.format(exp_name)
+            best_weight_load_path = ROOT_PATH + '/best_model_{}.h5'.format(exp_name)
             self.nn.load_weights(best_weight_load_path)
             print("load weight from :{}".format(best_weight_load_path))
         
@@ -508,7 +512,7 @@ class H_maxima_model:
 
         #Callback definition
         CBs = [
-            tf.keras.callbacks.ModelCheckpoint(args.ROOT_PATH + '/best_model_{}.h5'.format(exp_name), monitor='val_loss', verbose=1 ,save_weights_only=True, save_best_only=True, mode='min', period=1),
+            tf.keras.callbacks.ModelCheckpoint(ROOT_PATH + '/best_model_{}.h5'.format(exp_name), monitor='val_loss', verbose=1 ,save_weights_only=True, save_best_only=True, mode='min', period=1),
             tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=200, min_lr=0.0001),
             tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, batch_size=BATCH_SIZE, write_graph=True, write_grads=False, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None, embeddings_data=None, update_freq='epoch'),
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0,
@@ -539,7 +543,7 @@ class H_maxima_model:
         
     def test(self,):      
 
-        best_weight_load_path = args.model_weight_path #args.ROOT_PATH + '/pretrained_model_weight/best_model_{}.h5'.format(exp_name)
+        best_weight_load_path = args.model_weight_path #ROOT_PATH + '/pretrained_model_weight/best_model_{}.h5'.format(exp_name)
         self.nn.load_weights(best_weight_load_path)
         print("load weight from :{}".format(best_weight_load_path))
         
@@ -638,7 +642,7 @@ class H_maxima_model:
                 else :
                     imDetecCol[idxs[0], idxs[1], k] = 0
 
-            save_path = args.ROOT_PATH+"/visualize_test_{}".format(exp_name)
+            save_path = ROOT_PATH+"/visualize_test_{}".format(exp_name)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             plt.imsave(save_path+"/{}_Input.png".format(i), imCol)
@@ -660,7 +664,7 @@ class H_maxima_model:
         plt.xlabel('True cell number')
         plt.ylabel('Estimated cell number')
 
-        save_fig_path = args.ROOT_PATH+"/visualize_test_{}".format(exp_name)
+        save_fig_path = ROOT_PATH+"/visualize_test_{}".format(exp_name)
         if not os.path.exists(save_fig_path):
             os.makedirs(save_fig_path)
             print("{} made.".format(save_fig_path))
@@ -668,7 +672,7 @@ class H_maxima_model:
         for i in range(len(n_gt_array)):                           
             ax.annotate('%s' % str(i), xy = [n_gt_array[i], n_detec_array[i]] , textcoords='data')
         plt.title('Predicted vs true cell number, test set')
-        plt.savefig(args.ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'n_detect_and_n_gt'))
+        plt.savefig(ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'n_detect_and_n_gt'))
         plt.show()
 
 
@@ -689,7 +693,7 @@ class H_maxima_model:
         for i in range(len(gt_h_array)):                           
             ax.annotate('%s' % str(i), xy = [gt_h_array[i], pr_h_array[i]] , textcoords='data')
         plt.title('Predicted vs true h, test set')
-        plt.savefig(args.ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'pr_h_and_gt_h'))
+        plt.savefig(ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'pr_h_and_gt_h'))
         plt.show()
 
                 

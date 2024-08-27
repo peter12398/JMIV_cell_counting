@@ -33,6 +33,11 @@ import random
 print(tf.__version__)
 print('It should be >= 2.0.0.')
 
+import os
+dirname = os.getcwd()
+#dirname = os.path.dirname(__file__)
+parent_dir_name = os.path.dirname(dirname)
+print("parent_dir_name = {}.\n".format(parent_dir_name))
 
 PATCH_SIZE = 1024
 REDUCE_RATIO = 4
@@ -42,15 +47,15 @@ input_shape = [RESOLUTION,RESOLUTION,1]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", default="test", type=str, help="train or test")
-parser.add_argument("--ROOT_PATH", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells", type=str, help="path to the root dir")
-parser.add_argument("--DATA_DIR", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/data/CellPose_converted_05_06_2024_onlyRed_max3channels_bugfixUint8_less200", type=str, help="path to TRP1 dataset")
-parser.add_argument("--exp_name", default="CellPose_onlyRed_max3channels_dgmm24configs_RMSprop_1600_earlyp300_cache_set_05_06_2024_onlyRed_max3channels_bugfixUint8_less200", type=str, help="experiment name")
-parser.add_argument("--model_weight_path", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/best_model_CellPose_onlyRed_max3channels_dgmm24configs_RMSprop_1600_earlyp300_cache_set_05_06_2024_onlyRed_max3channels_bugfixUint8_less200.h5".format(PATCH_SIZE), type=str, help="experiment name")
+parser.add_argument("--DATA_DIR", default=parent_dir_name+"/data/cellpose/CellPose_converted", type=str, help="path to TRP1 dataset")
+parser.add_argument("--exp_name", default="debug", type=str, help="experiment name")
+parser.add_argument("--model_weight_path", default="pretrained/model/weight.h5", type=str, help="experiment name")
+parser.add_argument("--best_h_dataset_name", default="best_h_dataset255_CellPose_converted", type=str, help="best_h_dataset_name name")
 args = parser.parse_args()
 
 NORMALISE01 = False
 if not NORMALISE01:
-    dir_name = "best_h_dataset255_CellPose_converted_05_06_2024_onlyRed_max3channels_forloopearlystop_bugfixUint8_less200"
+    dir_name = args.best_h_dataset_name #"best_h_dataset255_CellPose_converted_05_06_2024_onlyRed_max3channels_forloopearlystop_bugfixUint8_less200"
     #dir_name = "best_h_dataset255_new"
 else:
     dir_name = "best_h_dataset01"

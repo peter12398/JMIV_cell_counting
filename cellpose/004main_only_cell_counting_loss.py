@@ -33,6 +33,12 @@ import random
 print(tf.__version__)
 print('It should be >= 2.0.0.')
 
+import os
+dirname = os.getcwd()
+#dirname = os.path.dirname(__file__)
+parent_dir_name = os.path.dirname(dirname)
+print("parent_dir_name = {}.\n".format(parent_dir_name))
+
 
 PATCH_SIZE = 1024
 REDUCE_RATIO = 4
@@ -42,22 +48,23 @@ input_shape = [RESOLUTION,RESOLUTION,1]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", default="test", type=str, help="train or test")
-parser.add_argument("--ROOT_PATH", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells", type=str, help="path to the root dir")
-parser.add_argument("--DATA_DIR", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/data/CellPose_converted_05_06_2024_onlyRed_max3channels_bugfixUint8_less200", type=str, help="path to TRP1 dataset")
-parser.add_argument("--exp_name", default="CellPose_onlyRed_max3channels_RMSprop_new_def_grad_minus_upstream_interactive_N_2_1600_earlyp300_cache_set_bugfixUint8_less200", type=str, help="experiment name")
-parser.add_argument("--model_weight_path", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/best_model_CellPose_onlyRed_max3channels_RMSprop_new_def_grad_minus_upstream_interactive_N_2_1600_earlyp300_cache_set_bugfixUint8_less200.h5".format(PATCH_SIZE), type=str, help="experiment name")
-
+parser.add_argument("--DATA_DIR", default = parent_dir_name + "/data/cellpose/CellPose_converted", type=str, help="path to CellPose dataset")
+parser.add_argument("--exp_name", default="debug", type=str, help="experiment name")
+parser.add_argument("--model_weight_path", default="pretrained/model/weight.h5", type=str, help="experiment name")
+parser.add_argument("--best_h_dataset_name", default="best_h_dataset255_CellPose_converted", type=str, help="best_h_dataset_name name")
+parser.add_argument("--Explicit_backpropagation_mode", default="minus_one", choices=["minus_one", "Puissance_N_2"] ,type=str, help="experiment name")
 args = parser.parse_args()
+
 
 NORMALISE01 = False
 if not NORMALISE01:
-    dir_name = "best_h_dataset255_CellPose_converted_05_06_2024_onlyRed_max3channels_forloopearlystop_bugfixUint8_less200"
+    dir_name = args.best_h_dataset_name #"best_h_dataset255_CellPose_converted_05_06_2024_onlyRed_max3channels_forloopearlystop_bugfixUint8_less200"
     #dir_name = "best_h_dataset255_new"
 else:
     dir_name = "best_h_dataset01"
 print("dir:{} used".format(dir_name))    
 
-ROOT_PATH = args.ROOT_PATH #"/home/xiaohu/workspace/MINES/DGMM2024_comptage_cellule"
+ROOT_PATH = parent_dir_name #"/home/xiaohu/workspace/MINES/DGMM2024_comptage_cellule"
 output_npy_save_path = ROOT_PATH + "/{}/ouput_np".format(dir_name)
 output_h_file_save_path = ROOT_PATH + "/{}/best_h".format(dir_name)
 input_npy_save_path = ROOT_PATH + "/{}/input_np".format(dir_name)
@@ -134,11 +141,22 @@ def custom_h_rec_and_exact_cc(xinput):
 
     N = 2
     print("N={} used inside.".format(N))
-    def grad(upstream):
-        return_grad = -upstream #upstream*tf.reduce_sum(-N*((x-xh)**(N-1)/(h**N))*((x-xh)/(h)+dxh_dh)) #tf.reduce_sum(N*h*((x - xh)/h)**N*(-dxh_dh/h - (x - xh)/h**2)/(x - xh),axis=[1,2])
-        print('return_grad:',return_grad)
-        return upstream, return_grad  #upstream *N*h*((x - xh)/h)**N*(-Derivative(xh(h), h)/h - (x - xh)/h**2)/(x - xh)
-    #Connect Components Counting
+    if args.Explicit_backpropagation_mode == "minus_one":
+        def grad(upstream):
+            return_grad = -upstream #upstream*tf.reduce_sum(-N*((x-xh)**(N-1)/(h**N))*((x-xh)/(h)+dxh_dh)) #tf.reduce_sum(N*h*((x - xh)/h)**N*(-dxh_dh/h - (x - xh)/h**2)/(x - xh),axis=[1,2])
+            print('return_grad:',return_grad)
+            return upstream, return_grad  #upstream *N*h*((x - xh)/h)**N*(-Derivative(xh(h), h)/h - (x - xh)/h**2)/(x - xh)
+        #Connect Components Counting
+
+    elif args.Explicit_backpropagation_mode == "Puissance_N_2":
+        def grad(upstream):
+            return_grad = upstream*tf.reduce_sum(-N*((x-xh)**(N-1)/(h**N))*((x-xh)/(h)+dxh_dh)) #tf.reduce_sum(N*h*((x - xh)/h)**N*(-dxh_dh/h - (x - xh)/h**2)/(x - xh),axis=[1,2])
+            print('return_grad:',return_grad)
+            return upstream, return_grad  #upstream *N*h*((x - xh)/h)**N*(-Derivative(xh(h), h)/h - (x - xh)/h**2)/(x - xh)
+        #Connect Components Counting
+    else:
+        raise NotImplementedError
+
 
     xminuxxh = dxh_dh #x-xh
     U=Sampling()(xminuxxh)
@@ -515,7 +533,7 @@ class H_maxima_model:
         self.resume = resume
         
         if self.resume:
-            best_weight_load_path = args.ROOT_PATH + '/best_model_{}.h5'.format(exp_name)
+            best_weight_load_path = ROOT_PATH + '/best_model_{}.h5'.format(exp_name)
             self.nn.load_weights(best_weight_load_path)
             print("load weight from :{}".format(best_weight_load_path))
         
@@ -556,7 +574,7 @@ class H_maxima_model:
 
         #Callback definition
         CBs = [
-            tf.keras.callbacks.ModelCheckpoint(args.ROOT_PATH + '/best_model_{}.h5'.format(exp_name), monitor='val_loss', verbose=1 ,save_weights_only=True, save_best_only=True, mode='min', period=1),
+            tf.keras.callbacks.ModelCheckpoint(ROOT_PATH + '/best_model_{}.h5'.format(exp_name), monitor='val_loss', verbose=1 ,save_weights_only=True, save_best_only=True, mode='min', period=1),
             tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=200, min_lr=0.0001),
             tf.keras.callbacks.TensorBoard(log_dir='./logs/{}'.format(exp_name), histogram_freq=0, batch_size=BATCH_SIZE, write_graph=True, write_grads=False, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None, embeddings_data=None, update_freq='epoch'),
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0,
@@ -588,7 +606,7 @@ class H_maxima_model:
         
     def test(self, test_set):      
 
-        best_weight_load_path = args.model_weight_path #args.ROOT_PATH + '/pretrained_model_weight/best_model_{}.h5'.format(exp_name)
+        best_weight_load_path = args.model_weight_path #ROOT_PATH + '/pretrained_model_weight/best_model_{}.h5'.format(exp_name)
         self.nn.load_weights(best_weight_load_path)
         print("load weight from :{}".format(best_weight_load_path))
         
@@ -702,7 +720,7 @@ class H_maxima_model:
                 else :
                     imDetecCol[idxs[0], idxs[1], k] = 0
 
-            save_path = args.ROOT_PATH+"/visualize_{}_{}".format("test" ,exp_name)
+            save_path = ROOT_PATH+"/visualize_{}_{}".format("test" ,exp_name)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             plt.imsave(save_path+"/{}_Input.png".format(imname), imCol)
@@ -724,7 +742,7 @@ class H_maxima_model:
         plt.xlabel('True cell number')
         plt.ylabel('Estimated cell number')
 
-        save_fig_path = args.ROOT_PATH+"/visualize_test_{}".format(exp_name)
+        save_fig_path = ROOT_PATH+"/visualize_test_{}".format(exp_name)
         if not os.path.exists(save_fig_path):
             os.makedirs(save_fig_path)
             print("{} made.".format(save_fig_path))
@@ -732,7 +750,7 @@ class H_maxima_model:
         for i in range(len(n_gt_array)):                           
             ax.annotate('%s' % str(i), xy = [n_gt_array[i], n_detec_array[i]] , textcoords='data')
         plt.title('True - predicted cell number, test set')
-        plt.savefig(args.ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'n_detect_and_n_gt'), dpi=300)
+        plt.savefig(ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'n_detect_and_n_gt'), dpi=300)
         plt.show()
 
 
@@ -753,7 +771,7 @@ class H_maxima_model:
         for i in range(len(gt_h_array)):                           
             ax.annotate('%s' % str(i), xy = [gt_h_array[i], pr_h_array[i]] , textcoords='data')
         plt.title('True - predicted h, test set')
-        plt.savefig(args.ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'pr_h_and_gt_h'), dpi=300)
+        plt.savefig(ROOT_PATH+"/visualize_test_{}/{}.jpg".format(exp_name,'pr_h_and_gt_h'), dpi=300)
         plt.show()
 
                 

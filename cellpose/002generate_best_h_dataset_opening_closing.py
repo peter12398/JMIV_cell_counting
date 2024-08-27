@@ -7,6 +7,8 @@ import glob, os
 from tqdm import tqdm
 import json
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..')
 import morpholayers.layers as ml
 import tensorflow as tf
 import tensorflow.keras.models as km
@@ -22,10 +24,14 @@ import argparse
 # Functions and algorithm for the detection of cells as h-maxima
 # Assuming 8 bits grayscale images
 
+import os
+dirname = os.getcwd()
+#dirname = os.path.dirname(__file__)
+parent_dir_name = os.path.dirname(dirname)
+print("parent_dir_name = {}.\n".format(parent_dir_name))
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--ROOT_PATH", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells", type=str, help="path to the root dir")
-parser.add_argument("--DATA_DIR", default="/cluster/CMM/home/xfliu/workspace/JMIV_counting_cells/data/CellPose_converted_05_06_2024_onlyRed_max3channels_bugfixUint8_less200/", type=str, help="path to CellPose dataset")
+parser.add_argument("--DATA_DIR", default = parent_dir_name + "/data/cellpose/CellPose_converted/", type=str, help="path to CellPose dataset")
 args = parser.parse_args()
 
 # Geodesic dilation
@@ -337,13 +343,13 @@ if __name__ == "__main__":
     MAX_0XH = True
     
     if not NORMALISE01:
-        dir_name = "best_h_dataset255_CellPose_converted_05_06_2024_onlyRed_max3channels_forloopearlystop_bugfixUint8_less200"
+        dir_name = "best_h_dataset255_CellPose_converted"
         #dir_name = "best_h_dataset255_se2"
         #dir_name = "best_h_dataset255_se4"
     else:
         raise NotImplementedError
         
-    ROOT_PATH = args.ROOT_PATH #"."
+    ROOT_PATH = parent_dir_name + "/data" #args.ROOT_PATH #"."
     output_image_save_path = ROOT_PATH + "/{}/ouput_images".format(dir_name)
     output_npy_save_path = ROOT_PATH + "/{}/ouput_np".format(dir_name)
     output_h_file_save_path = ROOT_PATH + "/{}/best_h".format(dir_name)
